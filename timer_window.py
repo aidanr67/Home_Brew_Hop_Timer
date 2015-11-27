@@ -21,7 +21,7 @@ class TimerWindow(QMainWindow): #Inherits from QMainWindow super class
 		self.timer = timer
 		self.boil = boil
 		self.alarmRinging = False
-		self.time = 60 
+		self.time = 60*60 
 		self.initTimerWindow()
 	
 	def initTimerWindow(self):
@@ -39,10 +39,14 @@ class TimerWindow(QMainWindow): #Inherits from QMainWindow super class
 		self.setNumber = QSpinBox(self)
 		self.setNumber.setFocus(True)
 		self.setNumber.selectAll()
+		self.setNumber.setValue(0)
 		self.timeLabel = QLabel("Time to addition: ")
 		self.timeDisplay = QLCDNumber(self)
 		self.timeDisplay.setSegmentStyle(QLCDNumber.Flat)
 		self.timeDisplay.setStyleSheet('color: black')
+		self.timeDisplay.setNumDigits(8)
+		# Set initial time
+		self.setTimeDisplay()
 		self.noteLabel = QLabel("Notes: ")
 		self.noteEdit = QLineEdit(self)
 		#For after alarm
@@ -55,9 +59,9 @@ class TimerWindow(QMainWindow): #Inherits from QMainWindow super class
 		self.timer_grid.addWidget(self.setLabel, 0, 0, 1, 2)
 		self.timer_grid.addWidget(self.setNumber, 0, 3)
 		self.timer_grid.addWidget(self.timeLabel, 1, 0, 1, 2)
-		self.timer_grid.addWidget(self.timeDisplay, 1, 3, 2, 2)
+		self.timer_grid.addWidget(self.timeDisplay, 1, 3, 2, 3)
 		self.timer_grid.addWidget(self.noteLabel, 3, 0)
-		self.timer_grid.addWidget(self.noteEdit, 3, 1, 1, 3)
+		self.timer_grid.addWidget(self.noteEdit, 3, 1, 1, 4)
 		#For after alarm
 		self.timer_grid.addWidget(self.stopButton, 0, 0, 2, 3)
 	
@@ -90,6 +94,26 @@ class TimerWindow(QMainWindow): #Inherits from QMainWindow super class
 			self.time = time
 			self.setTimeDisplay()
 		self.alarmRinging = False
+
+	def setTimeBox(self, time):
+		time = time
+		self.setNumber.setValue(time)
+		self.setTime()
+
+	def setNote(self, name, amount):
+		amount = amount * 1000
+		note = str(amount) + 'g ' + name
+		self.noteEdit.setText(note)
+
+	# for checking if timer exists
+	def getTime(self):
+		return self.setNumber.value() 
+	
+	#Adds info to timer note 
+	def addNoteInfo(self, name, amount):
+		amount = amount * 1000
+		note = self.noteEdit.text() + ' and ' + str(amount) + 'g ' + name
+		self.noteEdit.setText(note)
 
 	def timeout(self):
 		alarmStyle ="""
