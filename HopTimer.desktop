@@ -1,0 +1,10 @@
+#!/usr/bin/env xdg-open
+[Desktop Entry]
+Version=1.0
+Name=Hop Timer
+Comment= Multiple Instance Hop Timer
+Exec=python /usr/share/Hop_timer/hop_timer.py
+Path=/usr/share/Hop_timer
+Terminal=false
+Type=Application
+Categories=Utility:Application;
