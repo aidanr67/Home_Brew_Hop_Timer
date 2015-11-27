@@ -5,11 +5,13 @@
 #==============================================================================================
 #===========Includes===========================================================================
 import sys
+from os.path import expanduser
 from PyQt4.QtCore import *
 from PyQt4.QtGui import *
 from boil import *
 from timer_window import *
 from timer_thread import *
+from database import *
 #==============================================================================================
 
 # Initial Window class
@@ -26,11 +28,13 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 		self.timer = TimerThread()
 		self.timer.start()
 		self.initInitialWindow()
+		self.initMenuBar()
 		self.createMasterTime() # Master timer
+		self.setConnections()
 
 	def initInitialWindow(self):
 		self.setWindowTitle("Home Brew Hop Timer")
-		self.setGeometry(100,100, 900, 150)
+		self.setGeometry(100,100, 900, 300)
 		self.createInitialLayout()
 	
 		#Set central widget
@@ -47,6 +51,8 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 		self.startButton = QPushButton("Start")
 		self.stopButton = QPushButton("Stop")
 		self.stopButton.setDisabled(True)
+		self.resetButton = QPushButton("Reset")
+		self.resetButton.setVisible(False)
 		
 		#create layout to hold widgets
 		self.initialGrid = QGridLayout()
@@ -56,10 +62,22 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 		self.initialGrid.addWidget(self.setBoilTime, 1, 1)
 		self.initialGrid.addWidget(self.startButton, 2, 0, 1, 2)
 		self.initialGrid.addWidget(self.stopButton, 3, 0, 1, 2)
+		self.initialGrid.addWidget(self.resetButton, 3, 0, 1, 2)
 		
 		self.initialWidget = QWidget()
 		self.initialWidget.setLayout(self.initial_layout)
-		self.setConnections()
+
+	def initMenuBar(self):
+		self.menu = QMenuBar(self)
+		self.fileMenu = QMenu("&File", self)
+		self.menu.addMenu(self.fileMenu)
+		#Quit action	
+		self.quit = QAction("&Quit", self)
+		self.fileMenu.addAction(self.quit)
+		#Load Recipe action
+		self.recipe = QAction("&Load BrewTarget Recipe", self)
+		self.fileMenu.addAction(self.recipe)
+		
 
 	def setConnections(self):
 		#connections
@@ -67,8 +85,10 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 		self.setBoilTime.valueChanged.connect(self.setNewBoilTime)
 		self.startButton.clicked.connect(self.startTimers)
 		self.connect(self, SIGNAL('triggered()'), self.closeEvent)
-		self.stopButton.clicked.connect(self.stopTimers) 
-		
+		self.stopButton.clicked.connect(self.stopTimers)
+		self.resetButton.clicked.connect(self.resetTimers)
+		self.connect(self.quit, SIGNAL("triggered()"), self.close) 
+		self.connect(self.recipe, SIGNAL("triggered()"), self.addRecipe)	
 		#Connect timer emit
 		self.connect(self.timer, self.timer.signal, self.decrement)
 
@@ -99,7 +119,22 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 		self.timer.startTimer()
 		self.startButton.setDisabled(True)
 		self.stopButton.setDisabled(False)
+		self.setBoilTime.setDisabled(True)
+		self.resetButton.setVisible(False)
+		self.stopButton.setVisible(True)
 
+	def resetTimers(self):
+		if QMessageBox.warning(self,"Warning", "Are you sure you want to reset all timers.", "Reset", "Cancel") is 0:
+			self.setNewBoilTime()
+			self.setTimers()
+			self.resetButton.setVisible(False)
+			self.stopButton.setVisible(True)
+			self.setBoilTime.setDisabled(False)
+
+	def setTimers(self):
+		for timer in self.__timerList:
+			timer.setTime()
+		
 	#When main window is closed
 	def closeEvent(self, event):
 		if self.timer.isActive():
@@ -108,20 +143,24 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 			else:
 				self.timer.exit(0)
 				self.setTimerState(False)
-				for timer in self.__timerList:
-					timer.close()
+				self.closeAllTimers()
 		else:
 			self.timer.exit(0)
 			self.setTimerState(False)
 			for timer in self.__timerList:
 				timer.close()
 
+	def closeAllTimers(self):
+		for timer in self.__timerList:
+			timer.close()
 
 	#Stop all timers
 	def stopTimers(self):
 		self.timer.stopTimer()
 		self.startButton.setDisabled(False)
 		self.stopButton.setDisabled(True)
+		self.stopButton.setVisible(False)
+		self.resetButton.setVisible(True)
 
 	def decrement(self):
 		if self.boil.getTime() > 0:
@@ -137,3 +176,69 @@ class InitialWindow(QMainWindow): # Inherits from QMainWindow
 	#Set all timers as started/stopped
 	def setTimerState(self, isStarted):
 		self.boil.setStarted(isStarted)
+
+	#Load recipe from Brewtarget
+	def addRecipe(self):
+		home = expanduser("~")
+		home = home + '/.config/brewtarget/database.sqlite'
+		db = Database(home)
+		if not db.connect(): 
+			QMessageBox.warning(self, "Error", '''Failed to open BrewTarget database. This is most likely because BrewTarget is using it.
+If BrewTarget is open please close it.''')
+			
+		else:
+			indexedRecipes = db.getRecipes()
+			recipes = indexedRecipes[1]
+			selection, isSelected = QInputDialog.getItem(self, "Select Brewtarget Recipe", "Brewtarget Recipes",
+							recipes, 0, False)
+			#get recipe index
+			if isSelected and selection:
+				i = recipeIndex = 1 
+				for recipe in recipes:
+					if recipe == selection:
+						recipeIndex = i
+					i = i + 1
+			# set boil time
+				boilTime = db.getBoilTime(recipeIndex)
+				if boilTime != self.setBoilTime.value():
+					self.setBoilTime.setValue(boilTime)
+		
+#------------------------- get hop additions and create timers ------------------
+				#close existing timers
+				if self.__timerList:
+					if QMessageBox.warning(self,"Warning", "This will overwrite existing timers and stop timer if running.", "OK", "Cancel") is 0:
+						if self.timer.isActive():
+							self.stopTimers()
+						self.closeAllTimers()	
+						del self.__timerList[:] #empty list
+					else:
+						return
+				# Get recipe hop additions
+				hopAdditions = db.getHopAdditions(recipeIndex)
+				i = 0
+				for hopAddition in hopAdditions[0]:
+					match = False
+					hopAddition = int(hopAddition)
+					if not self.__timerList: #create first timer
+						self.timerFromRecipe(hopAddition, hopAdditions[1][i], hopAdditions[2][i])
+						match = True
+					else:
+						for timer in self.__timerList:
+							if timer.getTime() == hopAddition:
+								self.addToTimer(timer, hopAdditions[1][i], hopAdditions[2][i])
+								match = True
+					if not match:
+						self.timerFromRecipe(hopAddition, hopAdditions[1][i], hopAdditions[2][i])
+					i = i + 1
+			db.disconnect()
+			
+	def addToTimer(self, timer, name, amount):
+		timer.addNoteInfo(name, amount)
+		
+	def timerFromRecipe(self, time, name, amount):
+		self.timerWindow = TimerWindow(self.boil, self.timer)
+		self.timerWindow.setTimeBox(time)
+		self.timerWindow.setNote(name, amount)
+		self.timerWindow.show()
+		self.__timerList.append(self.timerWindow)
+					
