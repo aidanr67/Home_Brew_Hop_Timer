@@ -7,4 +7,4 @@ Particular strengths: You can create as many timers as you want (Handy for IPAs,
 Timers can be added after the main timer has been started so adjustments can be made mid boil.
 Can import hop additions from BrewTarget and set up timers automatically.
 
-ToDo: Allow timer configurations to be saved. Integrate better with BrewTarget.
+Note: This project has been integrated with Brewtarget.
